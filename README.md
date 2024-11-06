@@ -138,13 +138,3 @@ To allow the frontend to connect, CORS is enabled. You can customize the allowed
 
 Database
 This backend connects to an Azure SQL Database. Ensure your Azure SQL instance is properly configured to accept connections and that firewall settings allow access.
-
-License
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-yaml
-Copy code
-
----
-
-These README files offer clear setup instructions, configuration details, and usage information for both the frontend and backend of your Bookie application. Let me know if there’s anything more specific you’d like to include!
