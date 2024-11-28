@@ -14,32 +14,38 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BooksService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
-const book_entity_1 = require("./book.entity");
+const mongoose_1 = require("@nestjs/mongoose");
+const mongoose_2 = require("mongoose");
+const book_schema_1 = require("./book.schema");
 let BooksService = class BooksService {
-    constructor(booksRepository) {
-        this.booksRepository = booksRepository;
+    constructor(bookModel) {
+        this.bookModel = bookModel;
+    }
+    async findByISBN(ISBN) {
+        return this.bookModel.findOne({ where: { ISBN } });
+    }
+    async findById(id) {
+        return this.bookModel.findById(id).exec();
     }
     async findAll() {
-        return await this.booksRepository.find();
+        return this.bookModel.find().exec();
     }
     async create(book) {
-        return await this.booksRepository.save(book);
+        const createdBook = new this.bookModel(book);
+        return createdBook.save();
     }
     async update(id, book) {
-        await this.booksRepository.update(id, book);
-        return this.booksRepository.findOne({ where: { id } });
+        return this.bookModel.findByIdAndUpdate(id, book, { new: true }).exec();
     }
     async delete(id) {
-        const result = await this.booksRepository.delete(id);
-        return result.affected > 0;
+        const result = await this.bookModel.findByIdAndDelete(id).exec();
+        return result ? true : false;
     }
 };
 exports.BooksService = BooksService;
 exports.BooksService = BooksService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(book_entity_1.Book)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __param(0, (0, mongoose_1.InjectModel)(book_schema_1.Book.name)),
+    __metadata("design:paramtypes", [mongoose_2.Model])
 ], BooksService);
 //# sourceMappingURL=books.service.js.map

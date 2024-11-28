@@ -1,10 +1,11 @@
 import { BooksService } from './books.service';
-import { Book } from './book.entity';
+import { CreateBookDto } from '../books/dto/create-book.dto';
+import { Book } from './book.schema';
 export declare class BooksController {
     private readonly booksService;
     constructor(booksService: BooksService);
     findAll(): Promise<Book[]>;
-    create(book: Book): Promise<Book>;
-    update(id: number, book: Partial<Book>): Promise<Book | null>;
-    delete(id: number): Promise<boolean>;
+    create(bookDto: CreateBookDto, file: Express.Multer.File): Promise<Book>;
+    update(id: string, bookDto: Partial<CreateBookDto>, file: Express.Multer.File): Promise<Book | null>;
+    delete(id: string): Promise<boolean>;
 }

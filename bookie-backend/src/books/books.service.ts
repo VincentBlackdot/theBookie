@@ -1,54 +1,42 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Book } from './book.entity';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Book } from './book.schema';
 
-/**
- * @class BooksService
- * @brief Service to manage book operations.
- */
 @Injectable()
 export class BooksService {
-    constructor(
-        @InjectRepository(Book)
-        private booksRepository: Repository<Book>,
-    ) {}
 
-    /**
-     * @brief Finds all books in the library.
-     * @returns {Promise<Book[]>} A promise that resolves to an array of Book objects.
-     */
-    async findAll(): Promise<Book[]> {
-        return await this.booksRepository.find();
+  
+  constructor(
+    @InjectModel(Book.name) private bookModel: Model<Book>,
+  ) {}
+
+   // Add the findByISBN method
+   async findByISBN(ISBN: string): Promise<Book | null> {
+    return this.bookModel.findOne({ where: { ISBN } });
+  }
+
+    // Find book by ID
+    async findById(id: string): Promise<Book | null> {
+      return this.bookModel.findById(id).exec();
     }
 
-    /**
-     * @brief Creates a new book entry.
-     * @param {Book} book - The book object to create.
-     * @returns {Promise<Book>} A promise that resolves to the created book.
-     */
-    async create(book: Book): Promise<Book> {
-        return await this.booksRepository.save(book);
-    }
+  async findAll(): Promise<Book[]> {
+    return this.bookModel.find().exec();
+  }
 
-    /**
-     * @brief Updates an existing book.
-     * @param {number} id - The ID of the book to update.
-     * @param {Partial<Book>} book - The updated book data.
-     * @returns {Promise<Book | null>} The updated book, or null if not found.
-     */
-    async update(id: number, book: Partial<Book>): Promise<Book | null> {
-        await this.booksRepository.update(id, book);
-        return this.booksRepository.findOne({ where: { id } });
-    }
 
-    /**
-     * @brief Deletes a book by ID.
-     * @param {number} id - The ID of the book to delete.
-     * @returns {Promise<boolean>} True if the book was deleted, otherwise false.
-     */
-    async delete(id: number): Promise<boolean> {
-        const result = await this.booksRepository.delete(id);
-        return result.affected > 0;
-    }
+  async create(book: Book): Promise<Book> {
+    const createdBook = new this.bookModel(book);
+    return createdBook.save();
+  }
+
+  async update(id: string, book: Partial<Book>): Promise<Book | null> {
+    return this.bookModel.findByIdAndUpdate(id, book, { new: true }).exec();
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const result = await this.bookModel.findByIdAndDelete(id).exec();
+    return result ? true : false;
+  }
 }

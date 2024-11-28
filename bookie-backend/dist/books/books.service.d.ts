@@ -1,10 +1,12 @@
-import { Repository } from 'typeorm';
-import { Book } from './book.entity';
+import { Model } from 'mongoose';
+import { Book } from './book.schema';
 export declare class BooksService {
-    private booksRepository;
-    constructor(booksRepository: Repository<Book>);
+    private bookModel;
+    constructor(bookModel: Model<Book>);
+    findByISBN(ISBN: string): Promise<Book | null>;
+    findById(id: string): Promise<Book | null>;
     findAll(): Promise<Book[]>;
     create(book: Book): Promise<Book>;
-    update(id: number, book: Partial<Book>): Promise<Book | null>;
-    delete(id: number): Promise<boolean>;
+    update(id: string, book: Partial<Book>): Promise<Book | null>;
+    delete(id: string): Promise<boolean>;
 }
