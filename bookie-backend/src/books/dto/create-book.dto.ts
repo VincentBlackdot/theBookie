@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsString, Matches, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, Matches, IsBoolean, IsInt, Min, Max } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateBookDto {
   @IsNotEmpty({ message: 'Title is required' })
@@ -7,10 +8,34 @@ export class CreateBookDto {
   @IsNotEmpty({ message: 'Author is required' })
   author: string;
 
-  @IsNotEmpty({ message: 'ISBN is required' })
+  @IsOptional()
   @Matches(/^\d{13}$/, { message: 'ISBN must be a 13-digit number' })
-  ISBN: string;
+  ISBN?: string;
 
   @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => parseInt(value, 10))
+  @IsInt()
+  @Min(0)
+  @Max(5)
+  rating?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isBestSeller?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  @IsOptional()
+  @IsString()
   pdfUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  coverUrl?: string;
 }

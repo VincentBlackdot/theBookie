@@ -1,174 +1,322 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UploadedFile, UseInterceptors, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  NotFoundException,
+  InternalServerErrorException,
+  Query,
+  Request,
+  UploadedFiles,
+} from '@nestjs/common';
+import { FilesInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { BooksService } from './books.service';
-import { CreateBookDto } from '../books/dto/create-book.dto'; 
+import { CreateBookDto } from '../books/dto/create-book.dto';
+import { UpdateBookDto } from '../books/dto/update-book.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiConsumes, ApiBody } from '@nestjs/swagger';
-import { diskStorage } from 'multer';
+import { ApiConsumes, ApiBody, ApiOperation, ApiTags, ApiResponse } from '@nestjs/swagger';
+import multer, { diskStorage } from 'multer';
 import { extname } from 'path';
 import { Express } from 'express';
 import { Book } from './book.schema';
 import { Types } from 'mongoose';
+import { plainToInstance } from 'class-transformer';
+import { pdfFileUploadOptions, bookCoverUploadOptions } from '../utilities/file-upload.util';
+import { S3 } from 'aws-sdk';
+import * as fs from 'fs';
+import { uploadFileToS3 } from '../utilities/s3-upload';
+
+const s3 = new S3({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION,
+});
+
+
+@ApiTags('Books')
 @Controller('books')
 export class BooksController {
-  constructor(private readonly booksService: BooksService) {}
+  constructor(private readonly booksService: BooksService) { }
 
   @Get()
-  async findAll(): Promise<Book[]> {
-    return this.booksService.findAll();
+  @ApiOperation({ summary: 'Retrieve all books' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved all books',
+    type: [Book],
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+  })
+  async findAll(
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+    @Query('order') order: 'asc' | 'desc' = 'asc',
+  ): Promise<Book[]> {
+    return this.booksService.findAll(page, limit, order);
   }
+
+
+  @Get(':id')
+@ApiOperation({ summary: 'Retrieve a book by ID' })
+@ApiResponse({
+  status: 200,
+  description: 'Successfully retrieved the book',
+  type: Book,
+})
+@ApiResponse({
+  status: 404,
+  description: 'Book not found',
+})
+async findById(@Param('id') id: string): Promise<Book> {
+  const book = await this.booksService.findById(id);
+  if (!book) {
+    throw new NotFoundException('Book not found');
+  }
+  return book;
+}
+
+
 
   @Post()
   @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Create a new book' })
   @ApiBody({
-    description: 'Book data with an optional PDF file',
-    type: CreateBookDto, // Use DTO for validation
+    description: 'Book data with an optional PDF file and cover image',
+    type: CreateBookDto,
   })
-  @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: './uploads',
-      filename: (req, file, cb) => {
-        const fileExtension = extname(file.originalname);
-        const filename = `${Date.now()}${fileExtension}`;
-        cb(null, filename);
-      },
-    }),
-    fileFilter: (req, file, cb) => {
-      if (file.mimetype === 'application/pdf') {
-        cb(null, true); // Accept the file
-      } else {
-        // Reject the file with a custom error message
-        cb(new BadRequestException('Only PDF files are allowed'), false);
-      }
-    },
-    limits: {
-      fileSize: 10 * 1024 * 1024,  // Limit file size to 10 MB
-    },
-  }))
-  
-  
+  @ApiResponse({
+    status: 201,
+    description: 'Successfully created a new book',
+    type: Book,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request (e.g., missing required fields or file)',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+  })
+
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'pdfFile', maxCount: 1 },
+      { name: 'coverFile', maxCount: 1 },
+    ])
+  )
   async create(
-    @Body() bookDto: CreateBookDto, // Use DTO here for validation
-    @UploadedFile() file: Express.Multer.File, // Correctly typed now
-  ): Promise<Book> {
-    // Manually map the DTO to the Book entity if necessary
-    const book = new Book();
-    book.title = bookDto.title;
-    book.author = bookDto.author;
-    book.ISBN = bookDto.ISBN;
-
-    // Check for missing required fields (author and ISBN)
-    if (!book.author) {
-      throw new BadRequestException('Author is required');
-    }
-
-    if (!book.ISBN) {
-      throw new BadRequestException('ISBN is required');
-    }
-
-    const existingBook = await this.booksService.findByISBN(book.ISBN);
-    if (existingBook) {
-      throw new BadRequestException('A book with this ISBN already exists');
-    }
-
-    
-    if (!file) {
-      throw new BadRequestException('PDF file is required');
-    }
-
-
+    @Body() bookDto: CreateBookDto,
+    @UploadedFiles() files: { pdfFile?: Express.Multer.File[]; coverFile?: Express.Multer.File[] },
+  ) {
     try {
-      if (file) {
-        book.pdfUrl = file.filename;
+      // Validate and upload PDF
+      const pdfFile = files.pdfFile?.[0];
+      if (!pdfFile) {
+        throw new BadRequestException('PDF file is required');
       }
-      return await this.booksService.create(book);
+
+      const pdfUrl = await uploadFileToS3(pdfFile, process.env.S3_BUCKET_NAME, 'pdfs');
+
+      // Upload cover image if provided
+      let coverUrl = '';
+      const coverFile = files.coverFile?.[0];
+      if (coverFile) {
+        coverUrl =coverFile ? await uploadFileToS3(coverFile, process.env.S3_BUCKET_NAME, 'covers') : '';
+      }
+
+      // Save book to database
+      const newBook = await this.booksService.create({
+        ...bookDto,
+        pdfUrl,
+        coverUrl,
+      });
+
+      return newBook;
     } catch (error) {
-      throw new InternalServerErrorException('An unexpected error occurred while processing the request');
+      console.error('Error creating book:', error);
+      throw new BadRequestException('Failed to upload files');
     }
-    
-    // Now, you can pass the mapped book entity to the service
-    return this.booksService.create(book);
   }
+  
+
+
+
+
+
+
+
+
+
 
   @Put(':id')
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    description: 'Updated book data with an optional PDF file',
-    type: CreateBookDto, // Use DTO for validation
+  @ApiOperation({ summary: 'Update an existing book' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully updated the book',
+    type: Book,
   })
-  @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: './uploads',
-      filename: (req, file, cb) => {
-        const fileExtension = extname(file.originalname);
-        const filename = `${Date.now()}${fileExtension}`;
-        cb(null, filename);
-      },
-    }),
-    fileFilter: (req, file, cb) => {
-      if (file.mimetype === 'application/pdf') {
-        cb(null, true); // Accept the file
-      } else {
-        // Reject the file with a custom error message
-        cb(new BadRequestException('Only PDF files are allowed'), false);
-      }
-    },
-  }))
-  async update(
-    @Param('id') id: string,
-    @Body() bookDto: Partial<CreateBookDto>, // Use DTO for validation
-    @UploadedFile() file: Express.Multer.File,
-  ): Promise<Book | null> {
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request (e.g., invalid ID format or ISBN conflict)',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Book not found',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+  })
+  @UseInterceptors(FileInterceptor('file', pdfFileUploadOptions))
 
+  @Put(':id/increment/downloads')
+  @ApiOperation({ summary: 'Increment the download count of a book' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully incremented the download count',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid book ID format',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Book not found',
+  })
+  async incrementDownloads(@Param('id') id: string): Promise<Book> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid book ID format');
+    }
+  
+    const book = await this.booksService.findById(id);
+    if (!book) {
+      throw new NotFoundException('Book not found');
+    }
+  
+    book.downloads += 1;
+    return this.booksService.update(id, { downloads: book.downloads });
+  }
+  
+  
+
+
+  @Put(':id/status')
+  @ApiOperation({ summary: 'Update book status (bestseller/featured)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully updated the book status',
+    type: Book,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid book ID format',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Book not found',
+  })
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() statusUpdate: { isBestSeller: boolean; isFeatured: boolean },
+  ): Promise<Book> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid book ID format');
     }
 
-    // Map DTO to Book entity
+    const { isBestSeller, isFeatured } = statusUpdate;
+
+    try {
+      return await this.booksService.updateStatus(id, isBestSeller, isFeatured);
+    } catch (error) {
+      throw new InternalServerErrorException('An error occurred while updating the book status');
+    }
+  }
+
+  @Put(':id') // Expecting the ID as part of the route
+  async update(
+    @Param('id') id: string,
+    @Body() bookDto: UpdateBookDto,
+    @UploadedFile() file?: Express.Multer.File, // Optional file
+  ): Promise<any> {
+    // Validate ID format
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid book ID format');
+    }
+
+    // Check if the book exists
     const book = await this.booksService.findById(id);
     if (!book) {
-      throw new BadRequestException('Book not found');
+      throw new NotFoundException('Book not found');
     }
 
-    // Handle missing required fields (author and ISBN)
-    if (!bookDto.author) {
-      throw new BadRequestException('Author is required');
-    }
-
-    if (!bookDto.ISBN) {
-      throw new BadRequestException('ISBN is required');
-    }
-
-    if (!file) {
-      throw new BadRequestException('PDF file is required');
-    }
-
-    book.title = bookDto.title || book.title;
-    book.author = bookDto.author || book.author;
-    book.ISBN = bookDto.ISBN || book.ISBN;
-    try {
-      if (file) {
-        book.pdfUrl = file.filename;
+    // Validate ISBN if provided
+    if (bookDto.ISBN) {
+      const existingBook = await this.booksService.findByISBN(bookDto.ISBN);
+      if (existingBook && existingBook._id.toString() !== id) {
+        throw new BadRequestException('Another book with this ISBN already exists');
       }
-
-      return await this.booksService.update(id, book);
-    } catch (error) {
-      throw new InternalServerErrorException('An unexpected error occurred while processing the request');
     }
-    
-    return this.booksService.update(id, book);
+
+    // Dynamically update fields
+    const updates = { ...bookDto };
+
+    // Update the file if provided
+    // if (file) {
+    //   updates.pdfUrl = file.filename; // Replace with the new file's filename
+    // }
+
+    try {
+      // Save updates to the database
+      const updatedBook = await this.booksService.update(id, updates);
+      return {
+        success: true,
+        message: 'Book updated successfully',
+        data: updatedBook,
+      };
+    } catch (error) {
+      console.error('Error updating the book:', error);
+      throw new InternalServerErrorException('An error occurred while updating the book');
+    }
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a book by ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully deleted the book',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request (e.g., invalid ID format)',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Book not found',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+  })
   async delete(@Param('id') id: string): Promise<boolean> {
     // Validate ID format
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid book ID format');
     }
 
+    // Attempt to delete the book
     const deleted = await this.booksService.delete(id);
     if (!deleted) {
       throw new NotFoundException('Book not found');
     }
+
     return true;
   }
 }

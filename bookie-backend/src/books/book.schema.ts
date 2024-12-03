@@ -1,19 +1,35 @@
-import { Schema, Document } from 'mongoose';
-import { Prop, Schema as NestSchema, SchemaFactory } from '@nestjs/mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document } from 'mongoose';
 
-@NestSchema()
+@Schema()
 export class Book extends Document {
-  @Prop()
+  @Prop({ required: true })
   title: string;
 
-  @Prop()
+  @Prop({ required: true })
   author: string;
 
-  @Prop({ required: false })
+  @Prop()
   ISBN?: string;
 
+  @Prop({ required: true })
+  pdfUrl: string;
+
   @Prop()
-  pdfUrl: string; // The field storing the file ID from GridFS
+  coverUrl?: string;
+
+  @Prop()
+  description?: string;
+
+  @Prop({ default: 0 })
+  rating: number;
+
+  @Prop({ default: false })
+  isBestSeller: boolean;
+
+  @Prop({ default: false })
+  isFeatured: boolean;
+  downloads: number;
 }
 
 export const BookSchema = SchemaFactory.createForClass(Book);
