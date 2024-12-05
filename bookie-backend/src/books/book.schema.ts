@@ -29,6 +29,8 @@ export class Book extends Document {
 
   @Prop({ default: false })
   isFeatured: boolean;
+
+  @Prop({ default: 0 })
   downloads: number;
 }
 

@@ -2,21 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { Container, Typography, Grid, Paper, Rating, Chip, Button } from '@mui/material';
-import { Download, LibraryBooks } from '@mui/icons-material'; // Replaced BookOpen with LibraryBooks
-import { useParams } from 'react-router-dom';  // Import useParams from react-router-dom
-import apiService from '../../services/apiService'; 
-import { Link as RouterLink } from 'react-router-dom'; // Import the Link component from react-router-dom
+import { Download, LibraryBooks } from '@mui/icons-material';
+import { useParams } from 'react-router-dom';
+import apiService from '../../services/apiService';
+import { Link as RouterLink } from 'react-router-dom';
 
-export default function BookPage() {
-  const { id } = useParams();  // Get the id from the URL
-
+export default function BookDetails() {
+  const { id } = useParams();
   const [book, setBook] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
-    // Fetch the book by ID
     const fetchBook = async () => {
       try {
-        const response = await apiService.getBookById(id);  // Use the id from URL
+        const response = await apiService.getBookById(id);
         setBook(response.data);
       } catch (error) {
         console.error('Error fetching book:', error);
@@ -24,14 +23,30 @@ export default function BookPage() {
     };
 
     if (id) {
-      fetchBook();  // Make sure the id is valid before calling the API
+      fetchBook();
     }
   }, [id]);
+
+  const handleDownload = async () => {
+    if (!book || isDownloading) return;
+
+    setIsDownloading(true);
+    try {
+      // Update download count
+      const response = await apiService.incrementDownloads(id);
+      setBook(response.data);
+      
+      // Start download
+      window.open(book.pdfUrl, '_blank');
+    } catch (error) {
+      console.error('Error downloading book:', error);
+    }
+    setIsDownloading(false);
+  };
 
   if (!book) {
     return <div>Loading...</div>;
   }
-
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
@@ -49,7 +64,26 @@ export default function BookPage() {
             by {book.author}
           </Typography>
           <Rating value={book.rating} readOnly precision={0.5} sx={{ mb: 2 }} />
-          <Chip label={`${book.downloads} downloads`} sx={{ mb: 2 }} />
+          <Chip 
+            label={`${book.downloads || 0} downloads`} 
+            sx={{ mb: 2, mr: 1 }}
+            color="primary"
+            variant="outlined"
+          /> 
+          {book.isBestSeller && (
+            <Chip 
+              label="Bestseller" 
+              color="primary"
+              sx={{ mb: 2, mr: 1 }} 
+            />
+          )}
+          {book.isFeatured && (
+            <Chip 
+              label="Featured"
+              color="secondary"
+              sx={{ mb: 2 }} 
+            />
+          )}
           <Typography variant="body1" paragraph>
             {book.description}
           </Typography>
@@ -58,22 +92,14 @@ export default function BookPage() {
           </Typography>
           <Grid container spacing={2}>
             <Grid item>
-            <Button
-  variant="contained"
-  startIcon={<Download />}
-  href={book.pdfUrl}
-  target="_blank"
-  onClick={async () => {
-    try {
-      await apiService.incrementDownloads(id); // Call the increment API
-    } catch (error) {
-      console.error('Failed to increment downloads:', error);
-    }
-  }}
->
-  Download PDF
-</Button>
-
+              <Button
+                variant="contained"
+                startIcon={<Download />}
+                onClick={handleDownload}
+                disabled={isDownloading}
+              >
+                {isDownloading ? 'Downloading...' : 'Download PDF'}
+              </Button>
             </Grid>
           </Grid>
         </Grid>

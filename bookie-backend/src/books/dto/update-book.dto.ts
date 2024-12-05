@@ -1,4 +1,5 @@
 import { IsOptional, IsString, Matches, IsBoolean, IsInt, Min, Max } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class UpdateBookDto {
   @IsOptional()
@@ -14,14 +15,15 @@ export class UpdateBookDto {
   ISBN?: string;
 
   @IsOptional()
-  @IsInt()
-  @Min(0)
-  timesRead?: number;
+  @IsString()
+  description?: string;
 
   @IsOptional()
+  @Transform(({ value }) => parseInt(value, 10))
   @IsInt()
   @Min(0)
-  downloads?: number;
+  @Max(5)
+  rating?: number;
 
   @IsOptional()
   @IsBoolean()
@@ -33,15 +35,15 @@ export class UpdateBookDto {
 
   @IsOptional()
   @IsString()
-  coverUrl?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(5)
-  rating?: number;
+  pdfUrl?: string;
 
   @IsOptional()
   @IsString()
-  description?: string;
+  coverUrl?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => parseInt(value, 10))
+  @IsInt()
+  @Min(0)
+  downloads?: number;
 }

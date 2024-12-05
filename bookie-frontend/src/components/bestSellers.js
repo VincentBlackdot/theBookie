@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Box, Typography, IconButton, Card, CardContent, CardMedia, Link } from '@mui/material';
 import { ChevronLeft, ChevronRight } from '@mui/icons-material';
-import { getBooks } from '../services/apiService'; // Import the API service
+import apiService from '../services/apiService';// Import the API service
 import { Link as RouterLink } from 'react-router-dom'; // Import the Link component from react-router-dom
 
 export function Bestsellers() {
@@ -12,7 +12,7 @@ export function Bestsellers() {
   useEffect(() => {
     const fetchBestSellers = async () => {
       try {
-        const booksData = await getBooks();
+        const booksData = await apiService.getBooks();
         if (Array.isArray(booksData.data)) {
           const filteredBestsellers = booksData.data.filter(book => book.isBestSeller);
           setBestsellers(filteredBestsellers);

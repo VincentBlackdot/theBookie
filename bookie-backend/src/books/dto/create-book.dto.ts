@@ -38,4 +38,10 @@ export class CreateBookDto {
   @IsOptional()
   @IsString()
   coverUrl?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => parseInt(value, 10))
+  @IsInt()
+  @Min(0)
+  downloads?: number = 0;
 }

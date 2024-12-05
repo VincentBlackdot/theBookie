@@ -12,32 +12,29 @@ import {
   NotFoundException,
   InternalServerErrorException,
   Query,
-  Request,
   UploadedFiles,
+  Res,
 } from '@nestjs/common';
-import { FilesInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { BooksService } from './books.service';
 import { CreateBookDto } from '../books/dto/create-book.dto';
 import { UpdateBookDto } from '../books/dto/update-book.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiBody, ApiOperation, ApiTags, ApiResponse } from '@nestjs/swagger';
-import multer, { diskStorage } from 'multer';
-import { extname } from 'path';
 import { Express } from 'express';
 import { Book } from './book.schema';
 import { Types } from 'mongoose';
-import { plainToInstance } from 'class-transformer';
-import { pdfFileUploadOptions, bookCoverUploadOptions } from '../utilities/file-upload.util';
+import { pdfFileUploadOptions } from '../utilities/file-upload.util';
 import { S3 } from 'aws-sdk';
-import * as fs from 'fs';
 import { uploadFileToS3 } from '../utilities/s3-upload';
+import axios from 'axios';
+import { Response } from 'express';
 
 const s3 = new S3({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   region: process.env.AWS_REGION,
 });
-
 
 @ApiTags('Books')
 @Controller('books')
@@ -63,27 +60,47 @@ export class BooksController {
     return this.booksService.findAll(page, limit, order);
   }
 
-
   @Get(':id')
-@ApiOperation({ summary: 'Retrieve a book by ID' })
-@ApiResponse({
-  status: 200,
-  description: 'Successfully retrieved the book',
-  type: Book,
-})
-@ApiResponse({
-  status: 404,
-  description: 'Book not found',
-})
-async findById(@Param('id') id: string): Promise<Book> {
-  const book = await this.booksService.findById(id);
-  if (!book) {
-    throw new NotFoundException('Book not found');
+  @ApiOperation({ summary: 'Retrieve a book by ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved the book',
+    type: Book,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Book not found',
+  })
+  async findById(@Param('id') id: string): Promise<Book> {
+    const book = await this.booksService.findById(id);
+    if (!book) {
+      throw new NotFoundException('Book not found');
+    }
+    return book;
   }
-  return book;
-}
 
+  @Get('pdf/:id')
+  async getPdf(@Param('id') id: string, @Res() res: Response) {
+    try {
+      const book = await this.booksService.findById(id);
+      if (!book?.pdfUrl) {
+        return res.status(404).json({ message: 'PDF not found' });
+      }
 
+      const response = await axios({
+        method: 'get',
+        url: book.pdfUrl,
+        responseType: 'arraybuffer'
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${book.title}.pdf"`);
+      return res.send(response.data);
+    } catch (error) {
+      console.error('Error fetching PDF:', error);
+      return res.status(500).json({ message: 'Error fetching PDF' });
+    }
+  }
 
   @Post()
   @ApiConsumes('multipart/form-data')
@@ -129,7 +146,7 @@ async findById(@Param('id') id: string): Promise<Book> {
       let coverUrl = '';
       const coverFile = files.coverFile?.[0];
       if (coverFile) {
-        coverUrl =coverFile ? await uploadFileToS3(coverFile, process.env.S3_BUCKET_NAME, 'covers') : '';
+        coverUrl = coverFile ? await uploadFileToS3(coverFile, process.env.S3_BUCKET_NAME, 'covers') : '';
       }
 
       // Save book to database
@@ -145,68 +162,16 @@ async findById(@Param('id') id: string): Promise<Book> {
       throw new BadRequestException('Failed to upload files');
     }
   }
-  
 
-
-
-
-
-
-
-
-
-
-  @Put(':id')
-  @ApiOperation({ summary: 'Update an existing book' })
-  @ApiResponse({
-    status: 200,
-    description: 'Successfully updated the book',
-    type: Book,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad request (e.g., invalid ID format or ISBN conflict)',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Book not found',
-  })
-  @ApiResponse({
-    status: 500,
-    description: 'Internal server error',
-  })
-  @UseInterceptors(FileInterceptor('file', pdfFileUploadOptions))
-
-  @Put(':id/increment/downloads')
+  @Put(':id/downloads')
   @ApiOperation({ summary: 'Increment the download count of a book' })
-  @ApiResponse({
-    status: 200,
-    description: 'Successfully incremented the download count',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid book ID format',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Book not found',
-  })
   async incrementDownloads(@Param('id') id: string): Promise<Book> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid book ID format');
-    }
-  
-    const book = await this.booksService.findById(id);
-    if (!book) {
+    const updatedBook = await this.booksService.incrementDownloads(id);
+    if (!updatedBook) {
       throw new NotFoundException('Book not found');
     }
-  
-    book.downloads += 1;
-    return this.booksService.update(id, { downloads: book.downloads });
+    return updatedBook;
   }
-  
-  
-
 
   @Put(':id/status')
   @ApiOperation({ summary: 'Update book status (bestseller/featured)' })

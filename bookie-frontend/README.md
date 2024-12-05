@@ -1,70 +1,124 @@
-# Getting Started with Create React App
+# The Bookie Frontend
 
-This project was bootstrapped with [Create Blackdot Library app](https://github.com/facebook/create-react-app).
+## Overview
+The frontend of The Bookie is built with React.js, providing a modern and responsive user interface for the online bookstore application.
+
+## Project Structure
+```
+src/
+├── components/          # Reusable React components
+│   ├── bestSellers.js  # Best selling books component
+│   └── ...
+├── services/           # API and utility services
+│   ├── apiService.js   # Centralized API communication
+│   └── ...
+├── assets/            # Static assets (images, icons)
+└── App.js            # Main application component
+```
+
+## Key Features
+- Modern, responsive UI
+- Book browsing and searching
+- Shopping cart functionality
+- User authentication
+- Admin dashboard
+
+## Development Setup
+
+### Prerequisites
+- Node.js (v14 or higher)
+- npm (v6 or higher)
+
+### Installation
+1. Clone the repository
+2. Navigate to frontend directory:
+```bash
+cd bookie-frontend
+```
+3. Install dependencies:
+```bash
+npm install
+```
+4. Start development server:
+```bash
+npm start
+```
 
 ## Available Scripts
 
-In the project directory, you can run:
-
 ### `npm start`
-
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Runs the app in development mode at [http://localhost:3001](http://localhost:3001)
 
 ### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Launches the test runner in interactive watch mode
 
 ### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Builds the app for production to the `build` folder
 
 ### `npm run eject`
-
 **Note: this is a one-way operation. Once you `eject`, you can't go back!**
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Component Documentation
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### App.js
+Main application component that handles:
+- Routing
+- Global state management
+- Authentication state
+- Theme provider
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### bestSellers.js
+Component for displaying best-selling books:
+- Fetches data from backend API
+- Implements pagination
+- Handles loading and error states
 
-## Learn More
+### apiService.js
+Centralized service for API communication:
+- Implements axios for HTTP requests
+- Handles authentication headers
+- Provides error handling
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## State Management
+- React Context for global state
+- Local state with useState for component-specific data
+- Custom hooks for reusable state logic
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Styling
+- CSS Modules for component-specific styles
+- Global styles in App.css
+- Responsive design principles
 
-### Code Splitting
+## Best Practices
+1. Use functional components with hooks
+2. Implement proper error handling
+3. Follow consistent naming conventions
+4. Write reusable components
+5. Maintain proper component hierarchy
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Additional Resources
 
-### Analyzing the Bundle Size
+For more information about Create React App:
+- [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started)
+- [React documentation](https://reactjs.org/)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## Troubleshooting
 
-### Making a Progressive Web App
+### Common Issues
+1. API Connection Issues
+   - Verify backend server is running
+   - Check API endpoint configuration
+   - Validate authentication tokens
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+2. Build Problems
+   - Clear npm cache
+   - Delete node_modules and reinstall
+   - Check for conflicting dependencies
 
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+For additional Create React App documentation sections, see:
+- [Code Splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+- [Analyzing Bundle Size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+- [Progressive Web App](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+- [Advanced Configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+- [Deployment](https://facebook.github.io/create-react-app/docs/deployment)
+- [Build Fails to Minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)

@@ -10,7 +10,6 @@ export class BooksService {
     @InjectModel(Book.name) private bookModel: Model<Book>,
   ) {}
 
-  
   // Find book by ISBN
   async findByISBN(ISBN: string): Promise<Book | null> {
     return this.bookModel.findOne({ ISBN }).exec();
@@ -27,21 +26,18 @@ export class BooksService {
     limit = 10,
     order: 'asc' | 'desc' = 'asc',
   ): Promise<Book[]> {
-    const sortOrder = order === 'asc' ? 1 : -1; // Determine sorting order
+    const sortOrder = order === 'asc' ? 1 : -1;
     return this.bookModel
       .find()
-      .sort({ title: sortOrder }) // Default sorting by title
+      .sort({ title: sortOrder })
       .skip((page - 1) * limit)
       .limit(limit)
       .exec();
   }
   
-  
-
   // Create a new book
   async create(createBookDto: CreateBookDto): Promise<Book> {
     try {
-      // Check for duplicates based on ISBN
       if (createBookDto.ISBN) {
         const existingBook = await this.bookModel.findOne({ ISBN: createBookDto.ISBN });
         if (existingBook) {
@@ -49,17 +45,32 @@ export class BooksService {
         }
       }
 
-      const newBook = new this.bookModel(createBookDto);
+      const newBook = new this.bookModel({
+        ...createBookDto,
+        downloads: 0, // Ensure downloads starts at 0
+      });
       return await newBook.save();
     } catch (error) {
       throw new Error(`Failed to create book: ${error.message}`);
     }
   }
 
-
   // Update an existing book
   async update(id: string, book: Partial<Book>): Promise<Book | null> {
-    return this.bookModel.findByIdAndUpdate(id, book, { new: true }).exec();
+    return this.bookModel.findByIdAndUpdate(
+      id,
+      { $set: book },
+      { new: true }
+    ).exec();
+  }
+
+  // Increment downloads
+  async incrementDownloads(id: string): Promise<Book | null> {
+    return this.bookModel.findByIdAndUpdate(
+      id,
+      { $inc: { downloads: 1 } },
+      { new: true }
+    ).exec();
   }
 
   // Delete a book
@@ -67,18 +78,6 @@ export class BooksService {
     const result = await this.bookModel.findByIdAndDelete(id).exec();
     return result ? true : false;
   }
-
-  // Increment metrics: timesRead or downloads
-  // async incrementMetric(id: string, type: 'timesRead' | 'downloads'): Promise<Book | null> {
-  //   if (!['timesRead', 'downloads'].includes(type)) {
-  //     throw new Error(`Invalid metric type: ${type}`);
-  //   }
-  //   return this.bookModel.findByIdAndUpdate(
-  //     id,
-  //     { $inc: { [type]: 1 } },
-  //     { new: true },
-  //   ).exec();
-  // }
 
   // Update bestseller or featured status
   async updateStatus(id: string, isBestSeller: boolean, isFeatured: boolean): Promise<Book | null> {
